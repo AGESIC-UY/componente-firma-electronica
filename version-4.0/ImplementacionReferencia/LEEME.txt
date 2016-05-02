@@ -1,0 +1,4 @@
+Implementación de Referencia del Applet Java Web Start (AppletJWS)
+
+Es una implementación básica de ejemplo realizada en NetBeans.
+La misma ilustra como realizar el JNLP dinámico para cargar el applet via Java Web Start.
