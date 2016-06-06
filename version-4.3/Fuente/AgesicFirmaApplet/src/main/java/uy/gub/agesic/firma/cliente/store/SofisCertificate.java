@@ -1,0 +1,86 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package uy.gub.agesic.firma.cliente.store;
+
+import java.security.cert.X509Certificate;
+
+/**
+ *
+ * @author Sofis Solutions
+ */
+public class SofisCertificate{
+
+    private boolean ok = true;
+    private String alias;
+    private String nombre;
+    private Integer pos;
+    private X509Certificate certificate;
+    private CertStoreI store;
+    
+    
+
+    public SofisCertificate(String alias, String nombre, X509Certificate cert, CertStoreI ks) {
+        this.alias = alias;
+        this.nombre = nombre;
+        this.certificate = cert;
+        this.store = ks;
+    }
+
+    public SofisCertificate(String nombre, Integer pos, X509Certificate cert, CertStoreI ks) {
+        this.alias = nombre;
+        this.nombre = nombre;
+        this.pos = pos;
+        this.certificate = cert;
+        this.store = ks;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public String getAlias() {
+        return alias;
+    }
+
+    public boolean isOk() {
+        return ok;
+    }
+
+    public void setOk(boolean ok) {
+        this.ok = ok;
+    }
+
+    public Integer getPos() {
+        return pos;
+    }
+
+    public void setPos(Integer pos) {
+        this.pos = pos;
+    }
+
+    public X509Certificate getCertificate() {
+        return certificate;
+    }
+
+    public void setCertificate(X509Certificate certificate) {
+        this.certificate = certificate;
+    }
+
+    public CertStoreI getStore() {
+        return store;
+    }
+
+    public void setStore(CertStoreI store) {
+        this.store = store;
+    }
+
+    
+    
+
+    @Override
+    public String toString() {
+        return nombre;
+    }
+}

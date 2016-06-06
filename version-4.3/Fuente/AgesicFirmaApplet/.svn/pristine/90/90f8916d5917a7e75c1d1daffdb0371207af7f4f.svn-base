@@ -1,0 +1,410 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package uy.gub.agesic.firma.cliente.xml;
+import es.mityc.firmaJava.libreria.utilidades.UtilidadFirmaElectronica;
+import es.mityc.firmaJava.libreria.xades.*;
+import es.mityc.firmaJava.libreria.xades.errores.FirmaXMLError;
+import java.io.File;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.Provider;
+import java.security.Security;
+import java.security.cert.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import org.apache.commons.io.FileUtils;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import uy.gub.agesic.firma.cliente.config.ConfigurationUtil;
+import uy.gub.agesic.firma.cliente.config.MessagesUtil;
+import uy.gub.agesic.firma.cliente.exception.*;
+import uy.gub.agesic.firma.cliente.validaciones.CARootValidation;
+import uy.gub.agesic.firma.cliente.validaciones.CRLValidation;
+import uy.gub.agesic.firma.cliente.validaciones.UserCertificateValidation;
+import uy.gub.agesic.firma.cliente.store.SofisCertificate;
+import com.sun.org.apache.xerces.internal.parsers.DOMParser;
+import es.mityc.javasign.xml.refs.AllXMLToSign;
+import es.mityc.javasign.xml.refs.ObjectToSign;
+import java.io.FileInputStream;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.security.Key;
+import java.security.PublicKey;
+import java.security.cert.X509Certificate;
+import java.util.*;
+import javax.xml.crypto.AlgorithmMethod;
+import javax.xml.crypto.KeySelector;
+import javax.xml.crypto.KeySelectorException;
+import javax.xml.crypto.KeySelectorResult;
+import javax.xml.crypto.XMLCryptoContext;
+import javax.xml.crypto.XMLStructure;
+import javax.xml.crypto.dsig.Reference;
+import javax.xml.crypto.dsig.SignatureMethod;
+import javax.xml.crypto.dsig.XMLSignature;
+import javax.xml.crypto.dsig.XMLSignatureFactory;
+import javax.xml.crypto.dsig.dom.DOMValidateContext;
+import javax.xml.crypto.dsig.keyinfo.KeyInfo;
+import javax.xml.crypto.dsig.keyinfo.X509Data;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+/**
+ *
+ * @author Sofis Solutions (www.sofis-solutions.com)
+ */
+public class XMLSignatureImpl {
+
+    public File signXML(SofisCertificate certificate, String certificatePassword, File xmlToSign, String xmlSignedPath, String user_data, HashMap<String,String> options) throws CertificateExpiredException, CertificateNotYetValidException, UserVerificationException, IOException, SignException, StoreException, CRLVerificationException, CARootVerificationException {
+        ConfigurationUtil cfgUtil = new ConfigurationUtil(options);
+        MessagesUtil msgUtil = new MessagesUtil(options);
+        //obtenemos los vaores de la configuración 
+        boolean tsa = cfgUtil.getBooleanValue("TSA_ENABLED");
+        boolean ocsp = cfgUtil.getBooleanValue("OCSP_ENABLED");
+        String ocspDefaultUrl = cfgUtil.getValue("OCSP_DEFAULT_URL");
+        //si se debe validar el certificado en el cliente
+        boolean crl = cfgUtil.getBooleanValue("CRL_ENABLED");
+        boolean CA_ROOT_VALIDATION = cfgUtil.getBooleanValue("CA_ROOT_VALIDATION_ENABLE");
+        boolean USER_VALIDATION = cfgUtil.getBooleanValue("USER_VALIDATION_ENABLE");
+
+        String digestAlg = cfgUtil.getValue("DIGEST_ALG");
+
+        //seteamos el provider del Store si el mismo no es nulo
+        if (certificate.getStore().getProvider(certificate) != null) {
+            Security.addProvider(certificate.getStore().getProvider(certificate));
+            Security.addProvider(new BouncyCastleProvider());
+        }
+
+        X509Certificate X509cert = (X509Certificate) certificate.getCertificate();
+
+        //validamos el certificado que se está utilizando para firmar.
+        if (USER_VALIDATION) {
+            UserCertificateValidation.validateCertificate(X509cert, user_data);
+        }
+
+        if (crl) {
+            CRLValidation.validateCertificate(X509cert);
+        }
+
+        if (CA_ROOT_VALIDATION) {
+
+            Set<X509Certificate> additionalCerts = null;
+            try {
+                //dado el Keystore con los certificados de confianza, se genera el conjunto de los mismos.
+                String password = cfgUtil.getValue("KEYSTORE_TRUSTORE_PASS");
+                additionalCerts = new HashSet<X509Certificate>();
+                KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+                InputStream is = cfgUtil.getInputStream("KEYSTORE_TRUSTORE_NAME");
+                if (is != null) {
+                    keystore.load(is, password.toCharArray());
+                    PKIXParameters params = new PKIXParameters(keystore);
+                    for (TrustAnchor ta : params.getTrustAnchors()) {
+                        X509Certificate trustCert = ta.getTrustedCert();
+                        additionalCerts.add(trustCert);
+                    }
+                }
+
+            } catch (Exception w) {
+                throw new CARootVerificationException(msgUtil.getValue("MSG_CARootValidation_ERROR_GENERAL"));
+            }
+
+            if (additionalCerts != null) {
+                CARootValidation.validateCertificate(X509cert, additionalCerts);
+            } else {
+                throw new CARootVerificationException(msgUtil.getValue("MSG_CARootValidation_ERROR_GENERAL"));
+            }
+        }
+
+        FirmaXML fxml = new FirmaXML();
+        DataToSign tos = new DataToSign();
+        tos.setEnveloped(true);
+        String xmlDoc = FileUtils.readFileToString(xmlToSign);
+        try {
+            Document docToSign = convertirDeXml(xmlDoc);
+            tos.setDocument(docToSign);
+            tos.addObject(new ObjectToSign(new AllXMLToSign(), "", null, "text/xml", null));
+        } catch (Exception w) {
+            throw new SignException(w);
+        }
+        
+        if (tsa){
+            tos.setXadesFormat(EnumFormatoFirma.XAdES_T);
+            String TSA_URL = cfgUtil.getValue("TSA_URL");
+            fxml.setTSA(TSA_URL);
+        }
+        
+
+
+        if (digestAlg != null && digestAlg.equalsIgnoreCase("SHA-1")) {
+            tos.setAlgDigestXmlDSig(UtilidadFirmaElectronica.DIGEST_ALG_SHA1);
+        }
+        if (digestAlg != null && digestAlg.equalsIgnoreCase("SHA-256")) {
+            tos.setAlgDigestXmlDSig(UtilidadFirmaElectronica.DIGEST_ALG_SHA256_enc);
+            //tos.setAlgDigestXmlDSig(UtilidadFirmaElectronica.DIGEST_ALG_SHA256);
+        }
+
+
+
+        X509Certificate cer = certificate.getCertificate();
+        try {
+            PrivateKey privateKey = certificate.getStore().getPrivateKey(certificate, certificatePassword);
+            Provider provider = certificate.getStore().getProvider(certificate);
+            Object[] objetos = fxml.signFile(cer, tos, privateKey, provider);
+            org.w3c.dom.Document doc = (org.w3c.dom.Document) objetos[0];
+            TransformerFactory tFactory = TransformerFactory.newInstance();
+            Transformer transformer = tFactory.newTransformer();
+            DOMSource source = new DOMSource(doc);
+            File toReturn = new File(xmlSignedPath);
+            StreamResult result = new StreamResult(toReturn);
+            transformer.transform(source, result);
+            return toReturn;
+        } catch (Exception w) {
+            w.printStackTrace();
+            throw new SignException(w);
+        }
+    }
+
+    private class X509KeySelector extends KeySelector {
+
+        public KeySelectorResult select(KeyInfo keyInfo, KeySelector.Purpose purpose, AlgorithmMethod method, XMLCryptoContext context) throws KeySelectorException {
+            Iterator ki = keyInfo.getContent().iterator();
+            while (ki.hasNext()) {
+                XMLStructure info = (XMLStructure) ki.next();
+                if (!(info instanceof X509Data)) {
+                    continue;
+                }
+                X509Data x509Data = (X509Data) info;
+                Iterator xi = x509Data.getContent().iterator();
+                while (xi.hasNext()) {
+                    Object o = xi.next();
+                    if (!(o instanceof X509Certificate)) {
+                        continue;
+                    }
+                    final PublicKey key = ((X509Certificate) o).getPublicKey();
+                    // Make sure the algorithm is compatible
+                    // with the method.
+                    if (algEquals(method.getAlgorithm(), key.getAlgorithm())) {
+                        return new KeySelectorResult() {
+
+                            public Key getKey() {
+                                return key;
+                            }
+                        };
+                    }
+                }
+            }
+            throw new KeySelectorException("No key found!");
+        }
+
+        boolean algEquals(String algURI, String algName) {
+            if ((algName.equalsIgnoreCase("DSA")
+                    && algURI.equalsIgnoreCase(SignatureMethod.DSA_SHA1))
+                    || (algName.equalsIgnoreCase("RSA")
+                    && algURI.equalsIgnoreCase(SignatureMethod.RSA_SHA1))) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    private Document convertirDeXml(String xml) throws Exception {
+        try {
+            DOMParser parser = new DOMParser();
+            StringReader sr = new StringReader(xml);
+            parser.parse(new InputSource(sr));
+            Document doc = parser.getDocument();
+            return doc;
+        } catch (IOException ioEx) {
+            throw new Exception("No se pudo leer correctamente el xml.", ioEx);
+        } catch (SAXException sxEx) {
+            throw new Exception("El formato del documento xml no es correcto.", sxEx);
+        } finally {
+        }
+    }
+
+     /**
+     * Esta operación valida la firma del documento xml(Version java 7 o superiores)
+     *
+     * @param file File que representa el documento
+     * @return true si la validación dió OK, false en caso contrario
+     * @throws javax.xml.parsers.ParserConfigurationException
+     * @throws org.xml.sax.SAXException
+     * @throws java.lang.Exception
+     */
+    public boolean validarFirma2(File file) throws Exception {
+     boolean ret;
+    try{
+        FileInputStream fileInputStream=null;
+        byte[] bFile = new byte[(int) file.length()];
+     //convert file into array of bytes
+        fileInputStream = new FileInputStream(file);
+	fileInputStream.read(bFile);
+	fileInputStream.close(); 
+   
+        // Validadores extra
+         ValidarFirmaXML vxml=new ValidarFirmaXML();
+        List<ResultadoValidacion> coreValidity =  vxml.validar(bFile, null);
+        ret=coreValidity.get(0).isValidate();
+  }catch(Exception e){
+      e.printStackTrace();
+          ret= false;
+          
+          }  
+  return ret;
+  }
+    
+    
+    /**
+     * Esta operación valida la firma del documento xml(Version java 6 o inferiores)
+     *
+     * @param xml String que representa el xml
+     * @return true si la validación dió OK, false en caso contrario
+     * @throws javax.xml.parsers.ParserConfigurationException
+     * @throws org.xml.sax.SAXException
+     * @throws java.lang.Exception
+     */
+    public boolean validarFirma(String xml) throws Exception {
+        /*
+         * First we use a JAXP DocumentBuilderFactory to parse the XML document
+         * containing the Signature. An application obtains the default
+         * implementation for DocumentBuilderFactory by calling the following
+         * line of code:
+         */
+        Document doc = convertirDeXml(xml);
+
+        /*
+         * We need to specify the Signature element that we want to validate,
+         * since there could be more than one in the document. We use the DOM
+         * method Document.getElementsByTagNameNS, passing it the XML Signature
+         * namespace URI and the tag name of the Signature element, as shown:
+         */
+        NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+        //NodeList nl = doc.getElementsByTagName("ds:Signature");
+        if (nl == null || nl.getLength() == 0) {
+            throw new Exception("Cannot find Signature element");
+        }
+        /*
+         * We create an XMLValidateContext instance containing input parameters
+         * for validating the signature. Since we are using DOM, we instantiate
+         * a DOMValidateContext instance (a subclass of XMLValidateContext), and
+         * pass it two parameters, a KeyValueKeySelector object and a reference
+         * to the Signature element to be validated (which is the first entry of
+         * the NodeList we generated earlier):
+         */
+        DOMValidateContext valContext = new DOMValidateContext(new X509KeySelector(), nl.item(nl.getLength() - 1));
+        /*
+         * We extract the contents of the Signature element into an XMLSignature
+         * object. This process is called unmarshalling. The Signature element
+         * is unmarshalled using an XMLSignatureFactory object. An application
+         * can obtain a DOM implementation of XMLSignatureFactory by calling the
+         * following line of code
+         */
+
+        XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
+        /*
+         * We then invoke the unmarshalXMLSignature method of the factory to
+         * unmarshal an XMLSignature object, and pass it the validation context
+         * we created earlier:
+         */
+        XMLSignature signature = factory.unmarshalXMLSignature(valContext);
+        /*
+         * Now we are ready to validate the signature. We do this by invoking
+         * the validate method on the XMLSignature object, and pass it the
+         * validation context as follows:
+         */
+        
+        
+        boolean coreValidity = signature.validate(valContext);
+        /*
+         * The validate method returns "true" if the signature validates
+         * successfully according to the core validation rules in the W3C XML
+         * Signature Recommendation, and false otherwise.
+         */
+
+
+        if (!coreValidity) {
+            /*
+             * If the XMLSignature.validate method returns false, we can try to
+             * narrow down the cause of the failure. There are two phases in
+             * core XML Signature validation:
+             *
+             * Signature validation (the cryptographic verification of the
+             * signature) Reference validation (the verification of the digest
+             * of each reference in the signature)
+             *
+             * Each phase must be successful for the signature to be valid. To
+             * check if the signature failed to cryptographically validate, we
+             * can check the status, as follows:
+             */
+
+            boolean sv = signature.getSignatureValue().validate(valContext);
+            /*
+             * We can also iterate over the references and check the validation
+             * status of each one, as follows:
+             */
+
+            Iterator i = signature.getSignedInfo().getReferences().iterator();
+            for (int j = 0; i.hasNext(); j++) {
+                boolean refValid = ((Reference) i.next()).validate(valContext);
+            }
+        }
+        return coreValidity;
+    }
+    
+    
+    public static void main(String[] args) throws FirmaXMLError, Exception {
+    //    XMLSignatureImpl v = new XMLSignatureImpl();
+
+     //   File f = new File("PATH XML SIGNED");
+     //   String xml = FileUtils.readFileToString(f);
+     //   System.out.println("VALIDAR FIRMA " + v.validarFirma(xml));
+
+        //TSAClientBouncyCastle tsaClient = new TSAClientBouncyCastle("http://tsa.safelayer.com:8093/", null, null);
+     //   SignPanel forTest= new SignPanel();
+      /*    String userAgentExp= "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.0 Safari/537.36";
+            UserAgent tmp =UserAgent.parseUserAgentString(userAgentExp + "");          
+        StoreManagment store = new StoreManagment();
+        PKCS11CertStoreImpl tokenStore = new PKCS11CertStoreImpl(PKCS11CertStoreImpl.PKCS11CertStoreType.ETOKEN, tmp,null);
+        store.addCertStore(tokenStore);
+        List<SofisCertificate> certForTest= store.getSignCertificateFromPKCS11("1234", null, PKCS11CertStoreImpl.PKCS11CertStoreType.ETOKEN,"");
+      File xmlToSign = new File("/home/mike/Desktop/FirmaApplet/Pruebas/xml_sin_firmar.xml");
+   //  String xmlDir = System.getProperty("java.io.tmpdir") + File.separator + xmlToSign.getName().replaceFirst(".xml", "") + "_signed.xml";
+      */
+        
+      XMLSignatureImpl sign = new XMLSignatureImpl();
+      File f = new File("/home/mike/Desktop/pruebas_3.4/xml_firmado_token.xml");
+      String xml = FileUtils.readFileToString(f);
+    
+    //  File xmlSigned= sign.signXML(certForTest.get(0),"1234",xmlToSign,"/home/mike/Desktop/FirmaApplet/xml_firmado.xml",null,null);
+     boolean signed= sign.validarFirma2(f);
+    System.out.print(signed);
+             /*
+           SignPanel forTest= new SignPanel();
+          String userAgentExp= "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.0 Safari/537.36";
+            UserAgent tmp =UserAgent.parseUserAgentString(userAgentExp + "");          
+        StoreManagment store = new StoreManagment();
+        PKCS11CertStoreImpl tokenStore = new PKCS11CertStoreImpl(PKCS11CertStoreImpl.PKCS11CertStoreType.ETOKEN, tmp,null);
+        store.addCertStore(tokenStore);
+        List<SofisCertificate> certForTest= store.getSignCertificateFromPKCS11("", null, PKCS11CertStoreImpl.PKCS11CertStoreType.ETOKEN,"");
+      XMLSignatureImpl sign = new XMLSignatureImpl();
+      File pdfToSign = new File("/home/mike/Desktop/xml_prueba_1.xml");
+     String xmlDir = System.getProperty("java.io.tmpdir") + File.separator + pdfToSign.getName().replaceFirst(".xml", "") + "_signed.pdf";
+
+      File xmlSigned= sign.signXML(certForTest.get(0),"",pdfToSign,"/home/mike/Desktop/xml_firmado_1.xml",null,null);
+     */
+        
+    }
+        
+        
+    }
+
+

@@ -1,0 +1,176 @@
+package uy.gub.agesic.firma.cliente.applet;
+
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.UIManager;
+import uy.gub.agesic.firma.cliente.config.MessagesUtil;
+import uy.gub.agesic.firma.cliente.exception.CARootVerificationException;
+import uy.gub.agesic.firma.cliente.exception.CRLVerificationException;
+import uy.gub.agesic.firma.cliente.exception.UserVerificationException;
+import uy.gub.agesic.firma.cliente.exception.WSInvocationException;
+import uy.gub.agesic.firma.cliente.exception.WSInvocationInvalidTokenException;
+import uy.gub.agesic.firma.cliente.exception.WSInvocationTimeOutException;
+
+/**
+ * Clase que despliega el stacktrace de una exception , como un popup.
+ *
+ * @author sofis solutions
+ */
+public class ErrorDialog {
+
+    static MessagesUtil msgUtil = new MessagesUtil(null);
+
+    public ErrorDialog() {
+        super();
+    }
+
+    private static void setLookAndFeel() {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Despliega el stacktrace de la exception
+     *
+     * @param parent
+     * @param e
+     */
+    public static void showStackTraceErrorDialog(Container parent, Exception e) {
+        final JTextArea textArea = new JTextArea();
+        textArea.setFont(new Font("Sans-Serif", Font.PLAIN, 10));
+        textArea.setEditable(false);
+        StringWriter writer = new StringWriter();
+        e.printStackTrace(new PrintWriter(writer));
+        textArea.setText(writer.toString());
+
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(450, 250));
+
+        JOptionPane.showMessageDialog(parent, scrollPane, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    /*
+     * Formatea el texto a despelgar en el message dialog para que realice el
+     * wraped
+     */
+    public static String formatMessageDialogText(String toFormat) {
+        return "<html>"
+                + "<TABLE WIDTH=100% BORDER=0 CELLPADDING=0 CELLSPACING=0>"
+                + "<TR><TD WIDTH=600>"
+                + "<P ALIGN=LEFT>"
+                + toFormat
+                + "</P>"
+                + "</TD></TR>"
+                + "</TABLE>"
+                + "</html>";
+    }
+
+    /**
+     * Despliega un JOption Pane con el error
+     *
+     * @param parent
+     * @param message
+     */
+    public static void showMessageDialog(Container parent, String message) {
+        JOptionPane.showMessageDialog(parent, formatMessageDialogText(message), "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public static void showWarningDialog(Container parent, String message) {
+        JOptionPane.showMessageDialog(parent, formatMessageDialogText(message), "Error", JOptionPane.WARNING_MESSAGE);
+    }
+
+    /**
+     * Procesa la exception y despliega un JOption con el error
+     *
+     * @param parent
+     * @param exception
+     */
+    public static void showMessageDialog(Container parent, Throwable exception) {
+        if (exception instanceof UserVerificationException) {
+            if (exception.getMessage() != null && exception.getMessage().length() > 0) {
+                showMessageDialog(parent, msgUtil.getValue("MSG_VALIDATION_CERTIFICATE_USER") + ": " + exception.getMessage());
+            } else {
+                showMessageDialog(parent, msgUtil.getValue("MSG_VALIDATION_CERTIFICATE_USER"));
+            }
+
+            return;
+        }
+        if (exception instanceof CARootVerificationException) {
+            if (exception.getMessage() != null && exception.getMessage().length() > 0) {
+                showMessageDialog(parent, msgUtil.getValue("MSG_VALIDATION_CERTIFICATE_CA") + ": " + exception.getMessage());
+            } else {
+                showMessageDialog(parent, msgUtil.getValue("MSG_VALIDATION_CERTIFICATE_CA"));
+            }
+
+            return;
+        }
+        if (exception instanceof CRLVerificationException) {
+            if (exception.getMessage() != null && exception.getMessage().length() > 0) {
+                showMessageDialog(parent, msgUtil.getValue("MSG_VALIDATION_CERTIFICATE_CRL") + ": " + exception.getMessage());
+            } else {
+                showMessageDialog(parent, msgUtil.getValue("MSG_VALIDATION_CERTIFICATE_CRL"));
+            }
+
+            return;
+        }
+        if (exception instanceof WSInvocationException) {
+            showMessageDialog(parent, msgUtil.getValue("MSG_WS_INVOCATION_GENERAL") + ": " + exception.getMessage());
+            return;
+        }
+        if (exception instanceof WSInvocationTimeOutException) {
+            showMessageDialog(parent, msgUtil.getValue("MSG_WS_INVOCATION_TIMEOUT"));
+            return;
+        }
+        if (exception instanceof WSInvocationInvalidTokenException) {
+            showMessageDialog(parent, msgUtil.getValue("MSG_WS_INVOCATION_SECURITY"));
+            return;
+        }
+        showMessageDialog(parent, msgUtil.getValue("MSG_ERROR_GENERAL") + ": " + exception.getMessage());
+    }
+
+    /**
+     * Main de testing
+     *
+     * @param args
+     */
+    public static void main(String[] args) {
+        setLookAndFeel();
+        final JFrame frame = new JFrame();
+        JPanel panel = new JPanel();
+
+        JButton button = new JButton();
+        button.setText("Test Error Dialog");
+        button.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                try {
+                    throw new IOException();
+                } catch (IOException e) {
+                }
+            }
+        });
+
+        panel.add(button);
+        frame.add(panel);
+
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.pack();
+        frame.setVisible(true);
+
+    }
+}

@@ -1,0 +1,131 @@
+package uy.gub.agesic.firma.cliente.applet;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import javax.swing.SwingWorker;
+import uy.gub.agesic.firma.cliente.config.MessagesUtil;
+import uy.gub.agesic.firma.cliente.hash.HashSignatureImpl;
+import uy.gub.agesic.firma.cliente.pdf.PDFSignatureImpl;
+import uy.gub.agesic.firma.cliente.store.SofisCertificate;
+import uy.gub.agesic.firma.cliente.ws.trust.client.AgesicFirmaWSClient;
+import uy.gub.agesic.firma.cliente.xml.XMLSignatureImpl;
+import uy.gub.agesic.firma.ws.ResultadoValidacion;
+
+/**
+ * El SWING Worker que realiza la firma de los archivos desplegado en el APPLET
+ * y el envio del mismo a los servidores
+ *
+ * @author sofis solutions
+ */
+public class SignBackgroundWorkerStub extends SwingWorker {
+
+    SignPanelStub parent;
+    File[] documentosSigned;
+    File[] documentosToSign;
+    String tipoDocumentos;
+    SofisCertificate cert;
+    String pass;
+    String user_data;
+    String idTransaccion;
+    Throwable exception = null;
+    List<ResultadoValidacion> resultadoValidacion = null;
+    boolean usuarioDocumentoFirmado;
+    MessagesUtil msgUtil = new MessagesUtil(null);
+    HashMap opciones = null;
+    //Added by mike
+    String typeProvider = "";
+
+    public SignBackgroundWorkerStub(SofisCertificate cert, String pass, File[] documentosToSign, String tipoDocumentos, String userData, String idTransaccion, boolean usuarioDocumentoFirmado, HashMap opciones, SignPanelStub parent, String typeProvider) {
+        this.parent = parent;
+        this.cert = cert;
+        this.pass = pass;
+        this.documentosToSign = documentosToSign;
+        this.tipoDocumentos = tipoDocumentos;
+        this.user_data = userData;
+        this.idTransaccion = idTransaccion;
+        this.usuarioDocumentoFirmado = usuarioDocumentoFirmado;
+        this.opciones = opciones;
+        this.typeProvider = typeProvider;
+    }
+
+    @Override
+    protected Object doInBackground() throws Exception {
+        try {
+            documentosSigned = new File[documentosToSign.length];
+            //Firmar el pdf
+            if (tipoDocumentos.equalsIgnoreCase("pdf")) {
+                PDFSignatureImpl pdfSignatureImpl = new PDFSignatureImpl(typeProvider);
+                int i = 0;
+                for (File pdfToSign : documentosToSign) {
+                    String pdfDir = System.getProperty("java.io.tmpdir") + File.separator + pdfToSign.getName().replaceFirst(".pdf", "") + "_signed.pdf";
+                    documentosSigned[i] = pdfSignatureImpl.signPDF(cert, pass, pdfToSign, pdfDir, user_data, opciones);
+                    i++;
+                }
+
+            }
+
+            //Firmar el xml
+            if (tipoDocumentos.equalsIgnoreCase("xml")) {
+                XMLSignatureImpl xmlSignatureImpl = new XMLSignatureImpl();
+                int i = 0;
+                for (File xmlToSign : documentosToSign) {
+                    String xmlDir = System.getProperty("java.io.tmpdir") + File.separator + xmlToSign.getName().replaceFirst(".xml", "") + "_signed.xml";
+                    documentosSigned[i] = xmlSignatureImpl.signXML(cert, pass, xmlToSign, xmlDir, user_data, opciones);
+                    i++;
+                }
+            }
+
+            //Firmar el hash
+            if (tipoDocumentos.equalsIgnoreCase("hash")) {
+                HashSignatureImpl hashSignature = new HashSignatureImpl();
+                int i = 0;
+                for (File hashToSign : documentosToSign) {
+                    String hashDir = System.getProperty("java.io.tmpdir") + File.separator + hashToSign.getName() + "_signed";
+                    documentosSigned[i] = hashSignature.signHash(cert, pass, hashToSign, hashDir, user_data, opciones);
+                    i++;
+                }
+            }
+
+            if (!usuarioDocumentoFirmado) {
+                //envia los documentos
+                AgesicFirmaWSClient clientWs = new AgesicFirmaWSClient(this.opciones);
+                List<ResultadoValidacion> result = clientWs.comunicarDocumentos(idTransaccion, documentosSigned, cert.getCertificate());
+                if (result != null && result.isEmpty()) {
+                    resultadoValidacion = null;
+                    exception = null;
+                    return documentosSigned;
+                } else {
+                    String MESSAGE = msgUtil.getValue("MSG_ERROR_COMUNICACION_DOCUMENTOS");
+                    exception = new Exception(MESSAGE);
+                    resultadoValidacion = result;
+                    return null;
+                }
+            } else {
+                resultadoValidacion = null;
+                exception = null;
+                return documentosSigned;
+            }
+
+        } catch (Throwable e) {
+            e.printStackTrace();
+            exception = e;
+            return null;
+        }
+    }
+
+    @Override
+    protected void done() {
+        if (exception == null) {
+            //se pudo realizar la firma se notifica al viewer para que actualice el pdf que despliega , cierre el Dialogo Modal y despliege el mensaje
+            this.parent.viewer.signSuccessful(documentosSigned);
+        } else {
+            //se notifica al Panel Parent que muestre un error.
+            if (resultadoValidacion == null) {
+                this.parent.displayErrorMessage(exception);
+            } else {
+                this.parent.displayWarningMessage(documentosSigned, resultadoValidacion);
+            }
+        }
+    }
+}

@@ -1,0 +1,209 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package org.agesic.firma.validaciones.util;
+
+import com.itextpdf.text.pdf.AcroFields;
+import com.itextpdf.text.pdf.PdfPKCS7;
+import com.itextpdf.text.pdf.PdfReader;
+import es.mityc.firmaJava.libreria.xades.ExtraValidators;
+import es.mityc.firmaJava.libreria.xades.ResultadoValidacion;
+import es.mityc.firmaJava.libreria.xades.ValidarFirmaXML;
+import es.mityc.javasign.xml.xades.policy.IValidacionPolicy;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Iterator;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.activation.DataHandler;
+import org.agesic.firma.config.ConfigurationUtil;
+import org.agesic.firma.utils.Constantes;
+import org.apache.commons.io.IOUtils;
+
+
+/**
+ *
+ * @author usuario
+ */
+public class FirmaValidate {
+    
+    private static ConfigurationUtil cfgUtil = new ConfigurationUtil();
+    
+    public static boolean validarFirma(List<DataHandler> docs, String tipoFirma, byte[] cert){
+        
+        try {
+            if (Constantes.TIPO_FIRMA_PDF.equals(tipoFirma)){
+
+                for (DataHandler d: docs){
+                    if (!validarFirmaPDF(IOUtils.toByteArray(d.getInputStream()))){
+                        return false;
+                    }
+                }
+            }
+            if (Constantes.TIPO_FIRMA_XML.equals(tipoFirma)){
+                for (DataHandler d: docs){
+                    
+                    if (!validarFirmaXML(IOUtils.toByteArray(d.getInputStream()))){
+                        return false;
+                    }
+                }
+            }
+            if (Constantes.TIPO_FIRMA_HASH.equals(tipoFirma)){
+                for (DataHandler d: docs){
+                    if (!validarFirmaHASH(IOUtils.toByteArray(d.getInputStream()), cert)){
+                        return false;
+                    }
+                }
+            }
+
+        } catch (IOException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        } catch (Exception ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        }
+        return true;
+        
+        
+        
+
+
+    }
+    
+     public static boolean validarFirmaPDF(byte[] data) {
+        try {
+            PdfReader reader = new PdfReader(data);
+            AcroFields af = reader.getAcroFields();
+
+            List<String> names = af.getSignatureNames();
+            for (int k = 0; k < names.size(); ++k) {
+               String name = names.get(k);
+//               System.out.println("Signature name: " + name);
+//               System.out.println("Signature covers whole document: " + af.signatureCoversWholeDocument(name));
+               PdfPKCS7 pk = af.verifySignature(name);
+               Calendar cal = pk.getSignDate();
+               Certificate pkc[] = pk.getCertificates();
+//               System.out.println("Subject: " + PdfPKCS7.getSubjectFields(pk.getSigningCertificate()));
+               if (!pk.verify()){
+                   return false;
+               }
+
+               for (Certificate c: pkc){
+                String error = PdfPKCS7.verifyCertificate((X509Certificate)c, null, cal);
+                if (error == null){
+                    System.out.println("Certificates verified");
+                }else{
+                    System.out.println("Certificate failed: " + error);
+                    return false;
+                }
+               }
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        } catch (SignatureException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        }
+        return true;
+         
+     }
+     
+     public static boolean validarFirmaHASH(byte[] data, byte[] cert) {
+        try {
+               CertificateFactory cf = CertificateFactory.getInstance("X.509");
+               X509Certificate x509Certificate = (X509Certificate) cf.generateCertificate(new  ByteArrayInputStream(cert));
+               //Verifica que la firma de los bytes sea valida.
+              
+               String signAlg = cfgUtil.getValue("SIGN_ALG");
+               Signature sigver = Signature.getInstance(signAlg);
+               sigver.initVerify(x509Certificate.getPublicKey());
+               sigver.update(data);
+               return sigver.verify(data);
+               
+               
+               
+               
+               
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        } catch (SignatureException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        } catch (CertificateException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        } catch (InvalidKeyException ex) {
+            Logger.getLogger(FirmaValidate.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        }
+         
+         
+     }
+     
+     
+    
+     
+    
+     public static boolean validarFirmaXML(byte[] data) {
+         
+         ArrayList<IValidacionPolicy> arrayPolicies = new ArrayList<IValidacionPolicy> (1);
+         IValidacionPolicy policy = new CertPolicy();
+         arrayPolicies.add(policy);
+ 
+         // Validadores extra
+         ExtraValidators validator = new ExtraValidators(arrayPolicies, null, null);
+ 		
+         List<ResultadoValidacion> results = null;
+ 		
+         
+ 	 try {
+             ValidarFirmaXML vXml = new ValidarFirmaXML();
+             results = vXml.validar(data, validator);
+         } catch(Exception e){
+             e.printStackTrace();
+             return false;
+         }
+ 		
+         // Se muestra por consola el resultado de la validación
+         ResultadoValidacion result = null;
+         Iterator<ResultadoValidacion> it = results.iterator();
+         while (it.hasNext()) {
+             result = it.next();
+             boolean isValid = result.isValidate();
+             System.out.println("-----------------");
+             System.out.println("--- RESULTADO ---");
+             System.out.println("-----------------");
+             if(isValid){
+                 // El método getNivelValido devuelve el último nivel XAdES válido
+                 System.out.println("La firma es valida.\n" + result.getNivelValido()); 
+//                         + "\nCertificado: " + ((X509Certificate) result.getDatosFirma().getCadenaFirma().getCertificates().get(0)).getSubjectDN()
+//                         + "\nFirmado el: " + result.getDatosFirma().getFechaFirma()
+//                         + "\nEstado de confianza: " + result.getDatosFirma().esCadenaConfianza()
+//                         + "\nNodos firmados: " + result.getFirmados());
+             } else {
+                 // El método getLog devuelve el mensaje de error que invalidó la firma
+                 System.out.println("La firma NO es valida\n" + result.getLog());
+                 return false;
+             }
+         }
+         return true;
+     }
+ 
+     
+    
+}

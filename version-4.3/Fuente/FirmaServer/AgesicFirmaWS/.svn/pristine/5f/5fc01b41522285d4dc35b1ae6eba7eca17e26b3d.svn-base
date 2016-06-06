@@ -1,0 +1,73 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package org.agesic.firma.config;
+
+
+import java.io.InputStream;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.ResourceBundle;
+import java.util.Set;
+
+/**
+ * Acceso al archivo de configuración del APPLET
+ *
+ * @author sofis solutions (www.sofis-solutions.com)
+ */
+public class ConfigurationUtil {
+
+    //toma los valores de configuración de un Bundle o de un HashMap de opciones
+    private ResourceBundle bundle = null;
+    
+
+    public ConfigurationUtil() {
+        
+        bundle = ResourceBundle.getBundle("org.agesic.firma.config.configuration");
+    }
+
+    public String getValue(String key) {
+        try {
+            return bundle.getString(key);
+            
+
+        } catch (Exception e) {
+            return "??" + key + "??";
+        }
+
+    }
+
+    public boolean getBooleanValue(String key) {
+        String value  = bundle.getString(key);
+        
+
+        if (value != null && !value.equalsIgnoreCase("")) {
+            try {
+                return Boolean.parseBoolean(value);
+            } catch (Exception w) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public Integer getIntValue(String key) {
+
+        try {
+            String value = value = bundle.getString(key);
+            
+
+            return Integer.valueOf(value);
+        } catch (Exception e) {
+            return null;
+        }
+
+    }
+
+    
+
+    
+
+    
+}

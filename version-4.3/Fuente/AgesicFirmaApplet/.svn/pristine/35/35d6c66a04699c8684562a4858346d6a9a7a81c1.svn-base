@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog" prefer="system">
+    <system systemId="http://localhost:8080/AgesicFirmaWS/AgesicFirma?WSDL" uri="wsdl/localhost_8080/AgesicFirmaWS/AgesciFirmaWS.wsdl"/>
+    <system systemId="file:/C:/desarrollo/netbeans7.1.2/AGESIC_FIRMA_2.0/AgesicFirmaApplet/src/wsdl/AgesicFirmaWS.wsdl" uri="wsdl/AgesicFirmaWS.wsdl"/>
+    <system systemId="http://localhost:8080/AgesicFirmaWS/AgesicFirma?wsdl" uri="wsdl/localhost_8080/AgesicFirmaWS/AgesicFirma.wsdl"/>
+    <system systemId="http://localhost:8080/AgesicFirmaWS/AgesicFirma?xsd=1" uri="wsdl/localhost_8080/AgesicFirmaWS/AgesicFirma.xsd_1.xsd"/>
+</catalog>

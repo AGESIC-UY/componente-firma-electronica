@@ -1,0 +1,109 @@
+/*File
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package uy.gub.agesic.firma.cliente.store.pkcs11.safenet;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import nl.bitwalker.useragentutils.UserAgent;
+import nl.bitwalker.useragentutils.OperatingSystem;
+import uy.gub.agesic.firma.cliente.config.ConfigurationUtil;
+
+/**
+ *
+ * @author Sofis Solutions
+ */
+public class SafeNetConfigFile {
+    
+    private ConfigurationUtil cfgUtil;
+    final static String PATHS_SEPARATOR = ";";
+
+    public SafeNetConfigFile(ConfigurationUtil cfgUtil) {
+        this.cfgUtil = cfgUtil;
+    }
+    
+    
+    
+    public void createConfigFile(String path, UserAgent userAgent) throws IOException {
+
+        File f = new File(path);
+        if (!f.exists()) {
+            System.out.println("CREANDO SAFENET CONFIG FILE EN " + path);
+            f.createNewFile();
+        } else {
+            //si ya existe el archivo retornamos el archivo existente no lo volvemos a crear.
+            return;
+        }
+        
+        File flib;
+        String name = "safenet";
+
+        if (userAgent.getOperatingSystem().getGroup().equals(OperatingSystem.WINDOWS)) {
+
+            String paths = cfgUtil.getValue("SAFENET_WIN");
+            
+            for (String p: paths.split(PATHS_SEPARATOR)){
+                p = p.trim();
+                if (p.length()>0){
+                    flib = new File(p);
+                    if (flib.exists() && flib.canRead()){
+                        writeFile(f, name, p, true, "6");
+                        break;
+                    }
+                }
+            }
+            
+        }else{
+            String paths="";
+            if (userAgent.getOperatingSystem().getGroup().equals(OperatingSystem.LINUX)) {
+                paths = cfgUtil.getValue("SAFENET_LIN");
+            }else{
+                //MAC
+                paths = cfgUtil.getValue("SAFENET_MAC");
+            }
+            
+            for (String p: paths.split(PATHS_SEPARATOR)){
+                p = p.trim();
+                if (p.length()>0){
+                    flib = new File(p);
+                    if (flib.exists() && flib.canRead()){
+                        writeFile(f, name, p, true, "6");
+                        break;
+                    }else{
+                        //pruebo con numbre lib en minuscula
+                        p = p.toLowerCase();
+                        flib = new File(p);
+                        if (flib.exists() && flib.canRead()){
+                            writeFile(f, name, p, true, "6");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        
+    }
+    
+    
+    private void writeFile(File f, String name, String lib, boolean slot, String slotId) throws IOException{
+        
+        BufferedWriter out = new BufferedWriter(new FileWriter(f));
+        out.write("name = "+name);
+        out.newLine();
+        out.write("library= " + lib);
+        out.newLine();
+        if (slot){
+            out.write("slot= "+slotId);
+            out.newLine();
+        }
+        out.close();
+        
+        
+    }
+    
+}

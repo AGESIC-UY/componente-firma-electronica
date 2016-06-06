@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<definitions targetNamespace="http://ws.firma.agesic.gub.uy/" name="AgesicFirmaWS" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:wsp="http://www.w3.org/ns/ws-policy" xmlns:tns="http://ws.firma.agesic.gub.uy/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsp1_2="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+    <types>
+        <schema attributeFormDefault='unqualified' elementFormDefault='qualified' targetNamespace="http://ws.firma.agesic.gub.uy/" xmlns="http://www.w3.org/2001/XMLSchema">
+            <element name="obtenerDocumentos">
+                <complexType>
+                    <sequence>
+                        <element name="id_transaccion" type="string" minOccurs="0"/>
+                    </sequence>
+                </complexType>
+            </element>
+            <element name="obtenerDocumentosResponse">
+                <complexType>
+                    <sequence>
+                        <element  xmlns:ns3="http://www.w3.org/2005/05/xmlmime" 
+                                  maxOccurs="unbounded"
+                                  minOccurs="0" name="respuesta"  
+                                  ns3:expectedContentTypes="application/octet-stream"
+                                  type="base64Binary" />
+                    </sequence>
+                </complexType>
+            </element>
+            <element name="comunicarDocumentos">
+                <complexType>
+                    <sequence>
+                        <element name="id_transaccion" type="string" minOccurs="0"/>
+                        <element  xmlns:ns3="http://www.w3.org/2005/05/xmlmime" 
+                                      maxOccurs="unbounded"
+                                      minOccurs="0" name="documentos"  
+                                      ns3:expectedContentTypes="application/octet-stream"
+                                      type="base64Binary" />
+                    </sequence>
+                </complexType>
+            </element>
+            <element name="comunicarDocumentosResponse">
+                <complexType>
+                    <sequence>
+                        <element name="respuesta" type="int" minOccurs="0"/>
+                    </sequence>
+                </complexType>
+            </element>
+        </schema>
+    </types>
+    <message name="obtenerDocumentos">
+        <part name="parameters" element="tns:obtenerDocumentos"/>
+    </message>
+    <message name="obtenerDocumentosResponse">
+        <part name="parameters" element="tns:obtenerDocumentosResponse"/>
+    </message>
+    <message name="comunicarDocumentos">
+        <part name="parameters" element="tns:comunicarDocumentos"/>
+    </message>
+    <message name="comunicarDocumentosResponse">
+        <part name="parameters" element="tns:comunicarDocumentosResponse"/>
+    </message>
+    <portType name="AgesicFirmaWS">
+        <operation name="obtenerDocumentos">
+            <input wsam:Action="http://ws.firma.agesic.gub.uy/AgesicFirmaWS/obtenerDocumentosRequest" message="tns:obtenerDocumentos"/>
+            <output wsam:Action="http://ws.firma.agesic.gub.uy/AgesicFirmaWS/obtenerDocumentosResponse" message="tns:obtenerDocumentosResponse"/>
+        </operation>
+        <operation name="comunicarDocumentos">
+            <input wsam:Action="http://ws.firma.agesic.gub.uy/AgesicFirmaWS/comunicarDocumentosRequest" message="tns:comunicarDocumentos"/>
+            <output wsam:Action="http://ws.firma.agesic.gub.uy/AgesicFirmaWS/comunicarDocumentosResponse" message="tns:comunicarDocumentosResponse"/>
+        </operation>
+    </portType>
+    <binding name="AgesicFirmaWSPortBinding" type="tns:AgesicFirmaWS">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+        <operation name="obtenerDocumentos">
+            <soap:operation soapAction="ObDoc"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+        <operation name="comunicarDocumentos">
+            <soap:operation soapAction="ComDoc"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+    </binding>
+    <service name="AgesicFirmaWS">
+        <port name="AgesicFirmaWSPort" binding="tns:AgesicFirmaWSPortBinding">
+            <soap:address location="http://localhost:8080/AgesicFirmaWS/AgesicFirmaWS"/>
+        </port>
+    </service>
+</definitions>
+

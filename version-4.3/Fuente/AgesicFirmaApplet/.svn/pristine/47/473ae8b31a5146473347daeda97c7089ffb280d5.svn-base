@@ -1,0 +1,33 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>     
+  <head>       
+    <meta http-equiv="content-type" content="text/html; charset=windows-1250">       
+    <meta name="generator" content="PSPad editor, www.pspad.com">       
+    <title>    
+    </title>     
+  </head>   
+<script>
+function getUserAgent() {
+   return navigator.userAgent;
+ }
+ 
+function getProfile() {
+	return "";
+}
+         
+</script>   
+  <body>    
+    <applet width="600" height="400" archive="ini4j-0.5.2.jar, icepdf-core-4.3.2.jar, icepdf-viewer-4.3.2.jar, AgesicFirmaApplet-AgesicFirmaApplet.jar, bcprov-jdk15-1.46.jar, commons-codec-1.2.jar, bcmail-jdk15-1.46.jar,log4j-1.2.14.jar,swing-layout-1.0.3.jar,commons-io-2.1.jar,bcprov-jdk15-1.46.jar,MITyCLibAPI-1.0.4.jar,MITyCLibCert-1.0.4.jar,MITyCLibXADES-1.0.4.jar,MITyCLibTSA-1.0.4.jar,jss4.jar,commons-logging-1.1.jar,UserAgentUtils-1.2.4.jar,itextpdf-5.2.0.jar,bctsp-jdk15-1.46.jar,xmlsec-1.4.2-ADSI-1.0.jar">                                    
+      <param name="type"  value="application/x-java-applet;jpi-version=1.5.0"/>                                    
+      <param name="java_arguments"  value="-Xmx128m"/>                                    
+      <param name="classloader_cache"  value="false"/>                                    
+      <param name="codebase"  value="http://localhost:8080/">           
+      <param name="code"  value="uy.gub.agesic.firma.cliente.applet.SignApplet.class"/>
+      <!-- TIPO_DOCUMENTO=pdf, TIPO_DOCUMENTO= xml-->
+      <param name="TIPO_DOCUMENTO"  value="xml"/>
+      <param name="ID_TRANSACCION" value="123asdasd1902313123123"/>
+      <!-- true, false-->
+      <param name="DOCUMENTO_VISIBLE" value="true"/>                              
+    </applet>     
+  </body>
+</html>
