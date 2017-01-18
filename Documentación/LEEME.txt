@@ -1,0 +1,3 @@
+Por documentación el componente visitar el centro de recursos de AGESIC: https://centroderecursos.agesic.gub.uy/web/seguridad/wiki
+
+Se encuentra disponible un foro para realizar consultas: https://centroderecursos.agesic.gub.uy/web/seguridad/foro-de-consultas/-/message_boards/category/44005

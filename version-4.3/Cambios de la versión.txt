@@ -1,0 +1,2 @@
+Mejorado soporte a DNI electrónico.
+Correción de errores varios.
