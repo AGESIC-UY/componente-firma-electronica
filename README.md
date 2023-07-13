@@ -1,4 +1,4 @@
-# componente-firma- [Sin Mantenimiento]
+# componente-firma- [DESCONTINUADO]
 
 El "Applet de Firma Electrónica Avanzada" es un componente integrable a aplicaciones web, que recibe de la misma una colección de documentos (PDF, XML, Hash) y realice la firma electrónica avanzada de estos, utilizando un token de seguridad provisto por el usuario como elemento de firma.
 Entre las ventajas principales de la firma electrónica avanzada se encuentran:
